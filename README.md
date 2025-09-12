@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LMS (Learning Management System) – Server</title>
+ 
 </head>
 <body>
   <h1>LMS (Learning Management System) – Server</h1>
