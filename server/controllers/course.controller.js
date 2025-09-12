@@ -249,13 +249,13 @@ export const removeLectureFromCourse = asyncHandler(async (req, res, next) => {
 /*
  * @UPDATE_COURSE_BY_ID
  * @ROUTE @PUT {{URL}}/api/v1/courses/:id
- * @ACCESS Private (Admin only)
+ * @ACCESS Private (Admin only).
  */
 export const updateCourseById = asyncHandler(async (req, res, next) => {
   // Extracting the course id from the request params
   const { id } = req.params;
 
-  // Finding the course using the course id
+  // Finding the course using the course  id
   const course = await Course.findByIdAndUpdate(
     id,
     {
