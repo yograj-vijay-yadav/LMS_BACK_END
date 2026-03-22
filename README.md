@@ -311,27 +311,7 @@ server/
     </li>
   </ul>
 
-  <hr>
 
-  <h2>📚 Additional Resources</h2>
-  <ul>
-    <li><a href="https://expressjs.com/">Express.js Documentation</a></li>
-    <li><a href="https://docs.mongodb.com/">MongoDB Documentation</a></li>
-    <li><a href="https://mongoosejs.com/">Mongoose Documentation</a></li>
-    <li><a href="https://cloudinary.com/documentation">Cloudinary Docs</a></li>
-    <li><a href="https://razorpay.com/docs/">Razorpay Docs</a></li>
-  </ul>
-
-  <hr>
-
-  <h2>🤝 Contributing</h2>
-  <ol>
-    <li>Fork this repository</li>
-    <li>Create a feature branch (<code>git checkout -b feature/YourFeature</code>)</li>
-    <li>Commit your changes (<code>git commit -m "Add your feature"</code>)</li>
-    <li>Push to your branch (<code>git push origin feature/YourFeature</code>)</li>
-    <li>Open a pull request with a clear description of your changes</li>
-  </ol>
 
   <p>Thank you for exploring the LMS backend! If you have questions or suggestions, feel free to open an issue or start a discussion.</p>
   
