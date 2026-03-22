@@ -152,6 +152,8 @@ sudo systemctl start mongod
 
   <hr>
 
+
+
   <h2>📁 Project Structure</h2>
   <pre><code>
 server/
@@ -187,6 +189,10 @@ server/
   </code></pre>
 
   <hr>
+
+<img width="3241" height="819" alt="mermaid-diagram (1)" src="https://github.com/user-attachments/assets/8f83d9df-7a15-47c7-b979-0247f1e7641a" />
+
+
 
   <h2>🔌 API Endpoints</h2>
 
@@ -328,5 +334,7 @@ server/
   </ol>
 
   <p>Thank you for exploring the LMS backend! If you have questions or suggestions, feel free to open an issue or start a discussion.</p>
+  
 </body>
+
 </html>
