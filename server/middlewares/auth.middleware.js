@@ -13,9 +13,9 @@ export const isLoggedIn = asyncHandler(async (req, _res, next) => {
   }
 
   // Decoding the token using jwt package verify method
-  const decoded = await jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = await jwt.verify(token, process.env.JWT_SECRET);
 
-  // If no decode send the message unauthorized
+  // If no decode send the message unauthorizedd
   if (!decoded) {
     return next(new AppError("Unauthorized, please login to continue", 401));
   }
