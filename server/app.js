@@ -16,12 +16,15 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // Third-Party
-app.use(
-  cors({
-    origin: [process.env.FRONTEND_URL],
-    credentials: true,
-  })
-);
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "https://lms-front-end-pied.vercel.app"
+  ],
+  credentials: true,
+}));
+
+app.options("*", cors());
 
 
 app.use(morgan('dev'));
