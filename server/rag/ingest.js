@@ -1,152 +1,105 @@
-import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
-import { Document } from 'langchain/document';
-import { HuggingFaceTransformersEmbeddings } from '@langchain/community/embeddings/hf_transformers';
+import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
+import { Document } from '@langchain/core/documents';
+import { HuggingFaceInferenceEmbeddings } from "@langchain/community/embeddings/hf";
 import { Pinecone } from '@pinecone-database/pinecone';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const INDEX_NAME = process.env.PINECONE_INDEX_NAME || 'lms-rag-index';
 const NAME_SPACE = process.env.PINECONE_NAMESPACE || 'lms-content';
 
-/**
- * Static LMS knowledge base for RAG.
- * In production this can be replaced with CMS/database reads.
- */
-const LMS_DATA = {
-  courses: [
-    {
-      id: 'course-fullstack-web-dev',
-      title: 'Full Stack Web Development',
-      level: 'Beginner to Advanced',
-      details:
-        'Covers HTML, CSS, JavaScript, React, Node.js, Express, MongoDB, authentication, deployment, and capstone projects.'
-    },
-    {
-      id: 'course-data-structures-algorithms',
-      title: 'Data Structures and Algorithms',
-      level: 'Intermediate',
-      details:
-        'Focuses on arrays, linked lists, trees, graphs, recursion, dynamic programming, and interview-focused problem solving.'
-    },
-    {
-      id: 'course-devops-cloud',
-      title: 'DevOps and Cloud Fundamentals',
-      level: 'Intermediate',
-      details:
-        'Includes Docker, CI/CD pipelines, Linux fundamentals, infrastructure basics, and cloud deployment workflows.'
-    }
-  ],
-  pricing: {
-    model: 'single-subscription',
-    details:
-      'The LMS uses one subscription plan that unlocks access to all courses, including current and newly added content.',
-    billingOptions: ['monthly', 'yearly']
-  },
-  faqs: [
-    {
-      question: 'Do I get access to all courses with one plan?',
-      answer: 'Yes. A single subscription provides access to all LMS courses.'
-    },
-    {
-      question: 'Are new courses included in my subscription?',
-      answer: 'Yes. New courses are included at no additional cost while your subscription is active.'
-    },
-    {
-      question: 'Do courses include certificates?',
-      answer: 'Yes. Eligible courses provide completion certificates after meeting requirements.'
-    }
-  ]
-};
-
+// ✅ Embeddings
 const getEmbeddingsModel = () =>
-  new HuggingFaceTransformersEmbeddings({
-    model: 'sentence-transformers/all-MiniLM-L6-v2'
+  new HuggingFaceInferenceEmbeddings({
+    apiKey: process.env.HF_API_KEY,
+    model: "sentence-transformers/all-MiniLM-L6-v2"
   });
 
+// ✅ Pinecone
 const getPineconeIndex = async () => {
   const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
   return pinecone.index(INDEX_NAME);
 };
 
+// ✅ Sample LMS data
 const toDocuments = () => {
-  const documents = [];
-
-  LMS_DATA.courses.forEach((course) => {
-    documents.push(
-      new Document({
-        pageContent: `Course: ${course.title}\nLevel: ${course.level}\nDetails: ${course.details}`,
-        metadata: {
-          type: 'course',
-          sourceId: course.id,
-          title: course.title
-        }
-      })
-    );
-  });
-
-  documents.push(
-    new Document({
-      pageContent: `Pricing Model: ${LMS_DATA.pricing.model}\nDetails: ${LMS_DATA.pricing.details}\nBilling options: ${LMS_DATA.pricing.billingOptions.join(', ')}`,
-      metadata: {
-        type: 'pricing',
-        sourceId: 'pricing-single-subscription',
-        title: 'LMS Pricing'
-      }
-    })
-  );
-
-  LMS_DATA.faqs.forEach((faq, index) => {
-    documents.push(
-      new Document({
-        pageContent: `FAQ\nQ: ${faq.question}\nA: ${faq.answer}`,
-        metadata: {
-          type: 'faq',
-          sourceId: `faq-${index + 1}`,
-          title: faq.question
-        }
-      })
-    );
-  });
-
-  return documents;
+  return [
+    new Document({ pageContent: "Full Stack Web Development course with React, Node, MongoDB", metadata: { type: "course" }}),
+    new Document({ pageContent: "DSA covers arrays, trees, graphs", metadata: { type: "course" }}),
+    new Document({ pageContent: "DevOps includes Docker and CI/CD", metadata: { type: "course" }}),
+    new Document({ pageContent: "Single subscription gives access to all courses", metadata: { type: "pricing" }}),
+    new Document({ pageContent: "Yes, all courses included", metadata: { type: "faq" }}),
+    new Document({ pageContent: "Certificates are provided", metadata: { type: "faq" }})
+  ];
 };
 
 export const ingestLmsData = async () => {
-  if (!process.env.PINECONE_API_KEY) {
-    throw new Error('Missing PINECONE_API_KEY in environment variables.');
-  }
-
-  const sourceDocs = toDocuments();
+  const docs = toDocuments();
 
   const splitter = new RecursiveCharacterTextSplitter({
-    chunkSize: 700,
-    chunkOverlap: 120
+    chunkSize: 500,
+    chunkOverlap: 50
   });
 
-  const chunks = await splitter.splitDocuments(sourceDocs);
+  const chunks = await splitter.splitDocuments(docs);
+
+  if (!chunks.length) throw new Error("No chunks created");
+
+  const texts = chunks.map(c => c.pageContent);
+
   const embeddings = getEmbeddingsModel();
+
+  console.log("Docs:", docs.length);
+  console.log("Chunks:", chunks.length);
+  console.log("Texts:", texts.length);
+
+  // ✅ SINGLE embedding call (fast)
+  const allEmbeddings = await embeddings.embedDocuments(texts);
+
+  console.log("Embeddings:", allEmbeddings.length);
+
+  const vectors = chunks.map((doc, idx) => {
+    const embedding = allEmbeddings[idx];
+
+    if (!embedding || !embedding.length) {
+      throw new Error(`Invalid embedding at index ${idx}`);
+    }
+
+    return {
+      id: `doc-${idx}-${Date.now()}`,
+      values: Array.from(embedding),
+      metadata: {
+        ...doc.metadata,
+        text: doc.pageContent
+      }
+    };
+  });
+
+  console.log("Vectors:", vectors.length);
+  console.log("Sample vector ID:", vectors[0]?.id);
+
+  if (!vectors.length) throw new Error("No vectors created");
+
   const index = await getPineconeIndex();
 
-  const vectors = await Promise.all(
-    chunks.map(async (doc, idx) => {
-      const values = await embeddings.embedQuery(doc.pageContent);
+  try {
+    console.log("Sending to Pinecone...");
+    
+    // ✅ FIXED: Remove the {vectors} wrapper, just pass vectors
+    const response = await index.upsert(vectors);
 
-      return {
-        id: `${doc.metadata.sourceId}-chunk-${idx + 1}`,
-        values,
-        metadata: {
-          ...doc.metadata,
-          text: doc.pageContent
-        }
-      };
-    })
-  );
+    console.log("✅ Pinecone success:", response);
 
-  await index.namespace(NAME_SPACE).upsert(vectors);
+  } catch (err) {
+    console.error("❌ Pinecone FULL ERROR:", err);
+    throw err;
+  }
+
+  console.log("✅ Ingestion done");
 
   return {
-    message: 'Ingestion completed successfully.',
-    totalSourceDocuments: sourceDocs.length,
-    totalChunks: chunks.length,
-    namespace: NAME_SPACE,
-    indexName: INDEX_NAME
+    success: true,
+    count: vectors.length
   };
 };
