@@ -2,7 +2,9 @@ import { retrieveRelevantDocuments } from './retriever.js';
 import { generateRagAnswer } from './generator.js';
 
 export const runRagPipeline = async (query) => {
+  console.log("Running RAG pipeline for query:", query);
   const retrievedDocs = await retrieveRelevantDocuments(query, 4);
+  console.log("Retrieved docs:", retrievedDocs.length);
   const answer = await generateRagAnswer({ query, retrievedDocs });
 
   return {

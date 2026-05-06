@@ -6,23 +6,55 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const INDEX_NAME = process.env.PINECONE_INDEX_NAME || 'lms-rag-index';
-const NAME_SPACE = process.env.PINECONE_NAMESPACE || 'lms-content';
+const INDEX_NAME = process.env.PINECONE_INDEX_NAME || 'lms';
 
-// ✅ Embeddings
 const getEmbeddingsModel = () =>
   new HuggingFaceInferenceEmbeddings({
     apiKey: process.env.HF_API_KEY,
     model: "sentence-transformers/all-MiniLM-L6-v2"
   });
 
-// ✅ Pinecone
 const getPineconeIndex = async () => {
   const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
-  return pinecone.index(INDEX_NAME);
+  return pinecone.index(
+    INDEX_NAME,
+    "https://lms-8g84wlf.svc.aped-4627-b74a.pinecone.io"
+  );
 };
 
-// ✅ Sample LMS data
+const runCheck = async () => {
+  try {
+    const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
+
+    // List all indexes
+    const indexes = await pinecone.listIndexes();
+    console.log("Available indexes:", indexes);
+
+    if (!indexes.includes("lms")) {
+      console.error("❌ Index 'lms' not found. You may need to create it.");
+      return;
+    }
+
+    // Connect to your index
+    const index = pinecone.index("lms");
+
+    // Describe stats
+    const stats = await index.describeIndexStats();
+    console.log("Index stats:", JSON.stringify(stats, null, 2));
+
+    // Check dimension
+    if (stats.dimension !== 384) {
+      console.error(`❌ Dimension mismatch. Index dimension is ${stats.dimension}, but your embeddings are 384.`);
+    } else {
+      console.log("✅ Dimension matches (384).");
+    }
+  } catch (err) {
+    console.error("Error checking Pinecone:", err);
+  }
+};
+
+
+
 const toDocuments = () => {
   return [
     new Document({ pageContent: "Full Stack Web Development course with React, Node, MongoDB", metadata: { type: "course" }}),
@@ -35,6 +67,8 @@ const toDocuments = () => {
 };
 
 export const ingestLmsData = async () => {
+  runCheck();
+  console.log("Starting ingestion...");
   const docs = toDocuments();
 
   const splitter = new RecursiveCharacterTextSplitter({
@@ -54,30 +88,25 @@ export const ingestLmsData = async () => {
   console.log("Chunks:", chunks.length);
   console.log("Texts:", texts.length);
 
-  // ✅ SINGLE embedding call (fast)
   const allEmbeddings = await embeddings.embedDocuments(texts);
 
   console.log("Embeddings:", allEmbeddings.length);
 
-  const vectors = chunks.map((doc, idx) => {
-    const embedding = allEmbeddings[idx];
+  // Map over chunks to align with embeddings
+ const vectors = chunks.map((chunk, i) => ({
+  id: `chunk-${i}-${Date.now()}`,
+  values: allEmbeddings[i],
+  metadata: {
+    text: chunk.pageContent,
+    type: chunk.metadata?.type || "unknown"
+    // ❌ remove loc or convert to string
+    // loc: JSON.stringify(chunk.metadata?.loc) // optional if you want to keep it
+  }
+}));
 
-    if (!embedding || !embedding.length) {
-      throw new Error(`Invalid embedding at index ${idx}`);
-    }
-
-    return {
-      id: `doc-${idx}-${Date.now()}`,
-      values: Array.from(embedding),
-      metadata: {
-        ...doc.metadata,
-        text: doc.pageContent
-      }
-    };
-  });
 
   console.log("Vectors:", vectors.length);
-  console.log("Sample vector ID:", vectors[0]?.id);
+  console.log("Sample vector:", vectors[0]);
 
   if (!vectors.length) throw new Error("No vectors created");
 
@@ -86,8 +115,11 @@ export const ingestLmsData = async () => {
   try {
     console.log("Sending to Pinecone...");
     
-    // ✅ FIXED: Remove the {vectors} wrapper, just pass vectors
-    const response = await index.upsert(vectors);
+    // ✅ Correct format: wrap in { vectors }
+    const response = await index.upsert({
+  records: vectors
+});
+
 
     console.log("✅ Pinecone success:", response);
 
