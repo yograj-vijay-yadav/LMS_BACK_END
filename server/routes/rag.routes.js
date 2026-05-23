@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { runRagPipeline } from '../rag/pipeline.js';
-import { ingestLmsData } from '../rag/ingest.js';
+// import { ingestLmsData } from '../rag/eventIngestion.js';
+
 
 const router = Router();
 
@@ -19,13 +20,13 @@ router.post('/ask', async (req, res) => {
   }
 });
 
-router.post('/ingest', async (_req, res) => {
-  try {
-    const result = await ingestLmsData();
-    return res.status(200).json(result);
-  } catch (error) {
-    return res.status(500).json({ error: error.message || 'Failed to ingest LMS data.' });
-  }
-});
+// router.post('/ingest', async (_req, res) => {
+//   try {
+//     const result = await ingestLmsData();
+//     return res.status(200).json(result);
+//   } catch (error) {
+//     return res.status(500).json({ error: error.message || 'Failed to ingest LMS data.' });
+//   }
+// });
 
 export default router;

@@ -17,6 +17,14 @@ const connectToDB = async () => {
 
     if (connection) {
       console.log(`Connected to MongoDB: ${connection.host}`);
+    //   await User.create({
+    //   fullName: 'Admin User',
+    //   email: 'admin@example.com',
+    //   password: 'Admin@123456',
+    //   role: 'ADMIN',
+    // });
+    
+    console.log('Admin created successfully');
     }
   } catch (error) {
     console.log(error);

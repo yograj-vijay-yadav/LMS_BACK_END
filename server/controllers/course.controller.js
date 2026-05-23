@@ -6,6 +6,13 @@ import cloudinary from 'cloudinary';
 import asyncHandler from '../middlewares/asyncHandler.middleware.js';
 import Course from '../models/course.model.js';
 import AppError from '../utils/appError.js';
+import {
+  onCourseCreated,
+  onLectureAdded,
+  onLectureDeleted,
+  onCourseDeleted,
+  onCourseUpdated
+} from '../rag/eventIngestion.js';
 
 /*
  * @ALL_COURSES
@@ -82,6 +89,9 @@ export const createCourse = asyncHandler(async (req, res, next) => {
 
   // Save the changes
   await course.save();
+
+  // Emit event for ingestion
+  onCourseCreated(course).catch(err => console.error("Ingestion error:", err));
 
   res.status(201).json({
     success: true,
@@ -177,6 +187,9 @@ export const addLectureToCourseById = asyncHandler(async (req, res, next) => {
   // Save the course object
   await course.save();
 
+  // Emit event for ingestion
+  onLectureAdded(course).catch(err => console.error("Ingestion error:", err));
+
   res.status(200).json({
     success: true,
     message: 'Course lecture added successfully',
@@ -239,6 +252,9 @@ export const removeLectureFromCourse = asyncHandler(async (req, res, next) => {
   // Save the course object
   await course.save();
 
+  // Emit event for ingestion
+  onLectureDeleted(course).catch(err => console.error("Ingestion error:", err));
+
   // Return response
   res.status(200).json({
     success: true,
@@ -263,6 +279,7 @@ export const updateCourseById = asyncHandler(async (req, res, next) => {
     },
     {
       runValidators: true, // This will run the validation checks on the new data
+      new: true // Return the updated document
     }
   );
 
@@ -270,6 +287,9 @@ export const updateCourseById = asyncHandler(async (req, res, next) => {
   if (!course) {
     return next(new AppError('Invalid course id or course not found.', 400));
   }
+
+  // Emit event for ingestion
+  onCourseUpdated(course).catch(err => console.error("Ingestion error:", err));
 
   // Sending the response after success
   res.status(200).json({
@@ -297,6 +317,9 @@ export const deleteCourseById = asyncHandler(async (req, res, next) => {
 
   // Remove course
   await course.remove();
+
+  // Emit event for ingestion
+  onCourseDeleted(id).catch(err => console.error("Ingestion error:", err));
 
   // Send the message as response
   res.status(200).json({
