@@ -24,7 +24,7 @@ const connectToDB = async () => {
     //   role: 'ADMIN',
     // });
     
-    console.log('Admin created successfully');
+   // console.log('Admin created successfully');
     }
   } catch (error) {
     console.log(error);

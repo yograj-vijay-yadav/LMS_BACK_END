@@ -3,6 +3,7 @@ import Razorpay from 'razorpay';
 
 import app from './app.js';
 import connectToDB from './configs/dbConn.js';
+import { connectRedis } from './configs/redis.js';
 
 // Cloudinary configuration
 v2.config({
@@ -23,5 +24,10 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, async () => {
   // Connect to DB
   await connectToDB();
+
+  // Attempt to connect to Redis during startup. If Redis is unavailable
+  // connectRedis will log an error but will not throw — application stays up.
+  await connectRedis();
+
   console.log(`App is running at http://localhost:${PORT}`);
 });

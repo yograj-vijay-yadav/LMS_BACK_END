@@ -14,15 +14,43 @@ import {
   onCourseUpdated
 } from '../rag/eventIngestion.js';
 
+// Redis cache helpers (encapsulate all Redis logic so controllers stay clean)
+import {
+  getCache,
+  setCache,
+  deleteCache,
+  courseAllKey,
+  courseKey,
+} from '../utils/redisCache.js';
+
 /*
  * @ALL_COURSES
  * @ROUTE @GET {{URL}}/api/v1/courses
  * @ACCESS Public
  */
 export const getAllCourses = asyncHandler(async (_req, res, next) => {
-  // Find all the courses without lectures
+  // Cache key for the list of all courses (without lectures)
+  const cacheKey = courseAllKey();
+
+  // 1) Try to fetch cached result from Redis
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    // Return cached response and avoid DB hit
+     console.log("cached courses returned from redis");
+    return res.status(200).json({
+      success: true,
+      message: 'All courses (from cache)',
+      courses: cached,
+    });
+  }
+
+  // 2) Cache miss -> fetch from MongoDB
   const courses = await Course.find({}).select('-lectures');
 
+  // 3) Store result in Redis with 10 minutes TTL (600 seconds)
+  await setCache(cacheKey, courses, 10 * 60);
+
+  // 4) Return response
   res.status(200).json({
     success: true,
     message: 'All courses',
@@ -90,6 +118,12 @@ export const createCourse = asyncHandler(async (req, res, next) => {
   // Save the changes
   await course.save();
 
+  // Invalidate related Redis caches so subsequent GETs reflect the change
+  // - All courses listing should be invalidated when a new course is created
+  // - Per-course key (if any) can be removed as well
+  await deleteCache(courseAllKey());
+  await deleteCache(courseKey(course._id.toString()));
+
   // Emit event for ingestion
   onCourseCreated(course).catch(err => console.error("Ingestion error:", err));
 
@@ -108,12 +142,30 @@ export const createCourse = asyncHandler(async (req, res, next) => {
 export const getLecturesByCourseId = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
 
+  // Build cache key per course id
+  const cacheKey = courseKey(id);
+
+  // 1) Try cache first
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return res.status(200).json({
+      success: true,
+      message: 'Course lectures fetched successfully (from cache)',
+      lectures: cached,
+    });
+  }
+
+  // 2) Cache miss -> fetch from DB
   const course = await Course.findById(id);
 
   if (!course) {
     return next(new AppError('Invalid course id or course not found.', 404));
   }
 
+  // 3) Store lectures in cache for 10 minutes
+  await setCache(cacheKey, course.lectures, 10 * 60);
+
+  // 4) Return response
   res.status(200).json({
     success: true,
     message: 'Course lectures fetched successfully',
@@ -187,6 +239,10 @@ export const addLectureToCourseById = asyncHandler(async (req, res, next) => {
   // Save the course object
   await course.save();
 
+  // Invalidate related caches: list of courses and this specific course lectures
+  await deleteCache(courseAllKey());
+  await deleteCache(courseKey(course._id.toString()));
+
   // Emit event for ingestion
   onLectureAdded(course).catch(err => console.error("Ingestion error:", err));
 
@@ -252,6 +308,10 @@ export const removeLectureFromCourse = asyncHandler(async (req, res, next) => {
   // Save the course object
   await course.save();
 
+  // Invalidate related caches
+  await deleteCache(courseAllKey());
+  await deleteCache(courseKey(course._id.toString()));
+
   // Emit event for ingestion
   onLectureDeleted(course).catch(err => console.error("Ingestion error:", err));
 
@@ -291,6 +351,10 @@ export const updateCourseById = asyncHandler(async (req, res, next) => {
   // Emit event for ingestion
   onCourseUpdated(course).catch(err => console.error("Ingestion error:", err));
 
+  // Invalidate caches related to this course
+  await deleteCache(courseAllKey());
+  await deleteCache(courseKey(id));
+
   // Sending the response after success
   res.status(200).json({
     success: true,
@@ -317,6 +381,10 @@ export const deleteCourseById = asyncHandler(async (req, res, next) => {
 
   // Remove course
   await course.remove();
+
+  // Invalidate caches affected by this deletion
+  await deleteCache(courseAllKey());
+  await deleteCache(courseKey(id));
 
   // Emit event for ingestion
   onCourseDeleted(id).catch(err => console.error("Ingestion error:", err));

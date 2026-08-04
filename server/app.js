@@ -46,7 +46,7 @@ app.use('/api/v1/user', userRoutes);
 app.use('/api/v1/courses', courseRoutes);
 app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1', miscRoutes);
-app.use('/api/rag', ragRoutes);
+app.use('/api/v1/rag', ragRoutes);
 
 // Default catch all route - 404
 // app.all('*', (_req, res) => {
